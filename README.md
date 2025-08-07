@@ -1,5 +1,5 @@
 # About the Game
-> Avoid Obstacles is a basic game where you play as a block and get high score.
+> OBSTACLE DODGER is a basic game where you play as a block and get high score.
 
 ## How to Play
 * Swipe to move left and right, very easy
