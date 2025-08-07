@@ -6,7 +6,7 @@
 
 ## Installation
  * Open the index.html file in your browser.
- * Or [Here](com.example) to play instant
+ * Or [Here](https://catsilly.github.io/Obstacle-Dodger/) to play instant
 
 ## Credits
  * Developer: CatSilly (Sillycat)
