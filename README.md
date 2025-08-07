@@ -1,5 +1,3 @@
-[Avoid Obstacles]()
-
 [About the Game]()
 > Avoid Obstacles is a basic game where you play as a block and get high score.
 
