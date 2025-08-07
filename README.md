@@ -1,4 +1,4 @@
-Avoid Obstacles
+#Avoid Obstacles
 
 About the Game
 
