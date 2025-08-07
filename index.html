@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Obstacle Dodger</title>
+    <style>
+        /* --- General Setup --- */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0c0a18;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            flex-direction: column;
+            padding: 1rem;
+            margin: 0;
+            touch-action: none;
+            overflow: hidden;
+        }
+
+        /* --- Game Wrapper --- */
+        .game-wrapper {
+            width: 100%;
+            max-width: 480px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.25rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: #d8b4fe;
+            margin-bottom: 1rem;
+        }
+
+        .score-container {
+            font-size: 1.5rem;
+            font-family: monospace;
+            margin-bottom: 1rem;
+            color: #67e8f9;
+            transition: color 0.2s, transform 0.2s; /* Smooth transition */
+        }
+
+        /* CSS class for the level up flash effect */
+        .level-up {
+            color: #facc15 !important; /* Yellow color */
+            transform: scale(1.1);
+        }
+
+        /* --- Game Canvas --- */
+        canvas {
+            background-color: #1c1938;
+            display: block;
+            border-radius: 0.5rem;
+            box-shadow: 0 0 20px rgba(76, 29, 149, 0.5);
+            cursor: grab;
+            width: 100%;
+        }
+
+        canvas:active {
+            cursor: grabbing;
+        }
+
+        /* --- Game Over Modal --- */
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.8);
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+
+        .modal-content {
+            background-color: #1f2937;
+            border: 1px solid #9333ea;
+            padding: 2rem;
+            border-radius: 0.5rem;
+            text-align: center;
+            box-shadow: 0 0 30px rgba(147, 51, 234, 0.4);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .modal-content h2 {
+            font-size: 1.875rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: #ef4444;
+        }
+
+        .modal-content p {
+            font-size: 1.125rem;
+            margin-bottom: 0.5rem;
+            color: #d1d5db;
+        }
+
+        .modal-content .high-score-text {
+             margin-bottom: 2rem;
+        }
+
+        #finalScore { color: #67e8f9; }
+        #highScore { color: #facc15; }
+
+        .restart-button {
+            background-color: #9333ea;
+            color: #ffffff;
+            font-weight: 700;
+            padding: 1rem 2.5rem;
+            border-radius: 0.5rem;
+            font-size: 1.125rem;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            width: 100%;
+            max-width: 280px;
+        }
+
+        .restart-button:hover {
+            background-color: #7e22ce;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="game-wrapper">
+        <h1>OBSTACLE DODGER</h1>
+        <p class="subtitle">Drag the square to move and survive!</p>
+        
+        <div id="scoreContainer" class="score-container">Score: <span id="score">0</span></div>
+        
+        <canvas id="gameCanvas" width="480" height="640"></canvas>
+
+        <div id="gameOverModal" class="modal hidden">
+            <div class="modal-content">
+                <h2>GAME OVER!</h2>
+                <p>Final Score: <span id="finalScore">0</span></p>
+                <p class="high-score-text">High Score: <span id="highScore">0</span></p>
+                <button id="restartButton" class="restart-button">
+                    Play Again
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const scoreContainer = document.getElementById('scoreContainer');
+        const finalScoreEl = document.getElementById('finalScore');
+        const highScoreEl = document.getElementById('highScore');
+        const gameOverModal = document.getElementById('gameOverModal');
+        const restartButton = document.getElementById('restartButton');
+        
+        let player, enemies, score, highScore, gameOver, enemySpawnTimer, gameSpeed, animationFrameId, gameTime;
+        let isDragging = false, dragStartX, playerStartX;
+
+        highScore = localStorage.getItem('highScore_fallDown') || 0;
+
+        function init() {
+            player = { x: canvas.width / 2 - 20, y: canvas.height - 50, width: 40, height: 40, color: '#ffffff' };
+            enemies = [];
+            score = 0;
+            gameTime = 0;
+            gameOver = false;
+            enemySpawnTimer = 0;
+            gameSpeed = 3;
+            
+            scoreEl.textContent = 0;
+            highScoreEl.textContent = highScore;
+            gameOverModal.classList.add('hidden');
+
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function updateEnemies() {
+            const spawnThreshold = Math.max(15, 65 - gameSpeed * 4);
+            enemySpawnTimer++;
+            if (enemySpawnTimer > spawnThreshold) {
+                const size = Math.random() * 30 + 20;
+                const x = Math.random() * (canvas.width - size);
+                const colors = ['#ff007f', '#39ff14', '#08f7fe', '#ff8c00', '#a200ff', '#f0f'];
+                const color = colors[Math.floor(Math.random() * colors.length)];
+                enemies.push({ x, y: -size, width: size, height: size, color });
+                enemySpawnTimer = 0;
+            }
+            enemies.forEach(enemy => enemy.y += gameSpeed);
+            enemies = enemies.filter(enemy => enemy.y <= canvas.height);
+        }
+        
+        function updatePlayer() {
+            if (player.x < 0) player.x = 0;
+            if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
+        }
+
+        function checkCollision() {
+            for (const enemy of enemies) {
+                if (player.x < enemy.x + enemy.width && player.x + player.width > enemy.x && player.y < enemy.y + enemy.height && player.y + player.height > enemy.y) {
+                    gameOver = true;
+                    return;
+                }
+            }
+        }
+        
+        function updateGameProgress() {
+            gameTime++;
+            if (gameTime % 10 === 0) {
+                score++;
+                scoreEl.textContent = score;
+            }
+
+            if (gameTime > 0 && gameTime % 240 === 0) {
+                gameSpeed += 0.3;
+                
+                scoreContainer.classList.add('level-up');
+                setTimeout(() => {
+                    scoreContainer.classList.remove('level-up');
+                }, 400);
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            enemies.forEach(enemy => {
+                ctx.fillStyle = enemy.color;
+                ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
+            });
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+        }
+
+        function showGameOverScreen() {
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('highScore_fallDown', highScore);
+                highScoreEl.textContent = highScore;
+            }
+            finalScoreEl.textContent = score;
+            gameOverModal.classList.remove('hidden');
+        }
+
+        function gameLoop() {
+            if (gameOver) {
+                showGameOverScreen();
+                return;
+            }
+            updatePlayer();
+            updateEnemies();
+            updateGameProgress();
+            draw();
+            checkCollision();
+            animationFrameId = requestAnimationFrame(gameLoop);
+        }
+
+        function getEventX(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            return (clientX - rect.left) * (canvas.width / rect.width);
+        }
+
+        function dragStart(e) {
+            if (gameOver) return;
+            e.preventDefault();
+            isDragging = true;
+            dragStartX = getEventX(e);
+            playerStartX = player.x;
+            document.addEventListener('mousemove', dragMove);
+            document.addEventListener('touchmove', dragMove, { passive: false });
+            document.addEventListener('mouseup', dragEnd);
+            document.addEventListener('touchend', dragEnd);
+        }
+
+        function dragMove(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            const currentX = getEventX(e);
+            const deltaX = currentX - dragStartX;
+            player.x = playerStartX + deltaX;
+        }
+
+        function dragEnd() {
+            isDragging = false;
+            document.removeEventListener('mousemove', dragMove);
+            document.removeEventListener('touchmove', dragMove);
+            document.removeEventListener('mouseup', dragEnd);
+            document.removeEventListener('touchend', dragEnd);
+        }
+
+        canvas.addEventListener('mousedown', dragStart);
+        canvas.addEventListener('touchstart', dragStart, { passive: false });
+        restartButton.addEventListener('click', init);
+
+        init();
+    </script>
+</body>
+</html>
+
